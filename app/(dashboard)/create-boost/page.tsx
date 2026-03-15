@@ -6,6 +6,7 @@ import { Link2, Sparkles, Zap, User, CheckCircle, Loader2, AlertCircle } from "l
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { createBoostAction } from "@/lib/actions";
 
 export default function CreateBoostPage() {
   const router = useRouter();
@@ -89,6 +90,9 @@ export default function CreateBoostPage() {
       };
 
       await addDoc(collection(db, "boosts"), boostData);
+      
+      // Revalidate cache
+      await createBoostAction();
 
       // 2. Increment user's totalPosts count
       const userRef = doc(db, "users", currentUserId);

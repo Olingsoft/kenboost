@@ -6,45 +6,35 @@ import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebas
 import { auth, db } from "@/lib/firebase";
 import { User, Settings, TrendingUp, Link as LinkIcon, Star, CheckCircle, Loader2, MousePointerClick } from "lucide-react";
 
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [myBoosts, setMyBoosts] = useState<any[]>([]);
-  const [totalClicks, setTotalClicks] = useState(0);
+
+  const { data: myBoostsFetched, mutate: mutateBoosts } = useSWR(
+    firebaseUser ? `/api/boosts/user?userId=${firebaseUser.uid}` : null,
+    fetcher
+  );
+
+  const myBoosts = myBoostsFetched || [];
+  const totalClicks = myBoosts.reduce((sum: number, b: any) => sum + (b.clicks || 0), 0);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
         try {
-          // 1. Get user document
+          // Get user document
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             setUserData(userDoc.data());
           }
-
-          // 2. Get user's boosts
-          const q = query(
-            collection(db, "boosts"),
-            where("userId", "==", user.uid),
-            orderBy("createdAt", "desc")
-          );
-          
-          const querySnapshot = await getDocs(q);
-          const boosts = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          
-          setMyBoosts(boosts);
-          
-          // 3. Calculate total clicks
-          const total = boosts.reduce((sum, b: any) => sum + (b.clicks || 0), 0);
-          setTotalClicks(total);
-          
         } catch (error) {
-          console.error("Error fetching profile data:", error);
+          console.error("Error fetching user data:", error);
         }
       }
       setLoading(false);

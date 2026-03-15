@@ -9,59 +9,34 @@ import { extractTikTokVideoId, extractTikTokUsername } from "@/lib/utils";
 
 const CATEGORIES = ["All", "Followers", "Views", "Likes", "Comments"];
 
+import useSWRInfinite from "swr/infinite";
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function FeedPage() {
   const [activeTab, setActiveTab] = useState("All");
-  const [loading, setLoading] = useState(true);
-  const [feed, setFeed] = useState<any[]>([]);
+
+  const getKey = (pageIndex: number, previousPageData: any[]) => {
+    if (previousPageData && !previousPageData.length) return null;
+    const lastId = previousPageData ? previousPageData[previousPageData.length - 1].id : null;
+    return `/api/boosts?category=${activeTab}&limit=10${lastId ? `&lastId=${lastId}` : ""}`;
+  };
+
+  const { data, error, size, setSize, isValidating } = useSWRInfinite(getKey, fetcher, {
+    revalidateOnFocus: false,
+    revalidateFirstPage: false,
+  });
+
+  const feed = data ? data.flat() : [];
+  const isLoadingInitialData = !data && !error;
+  const isLoadingMore = isLoadingInitialData || (size > 0 && data && typeof data[size - 1] === "undefined");
+  const isEmpty = data?.[0]?.length === 0;
+  const isReachingEnd = isEmpty || (data && data[data.length - 1]?.length < 10);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "boosts"),
-      where("status", "==", "Active"),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const feedData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const type = data.type;
-        const target = data.target;
-
-        let username = "user";
-        let videoId = "";
-        let href = target;
-
-        if (type === "Followers") {
-          username = target.replace("@", "");
-          href = `https://www.tiktok.com/@${username}`;
-        } else {
-          username = extractTikTokUsername(target);
-          videoId = extractTikTokVideoId(target) || "";
-        }
-
-        return {
-          id: doc.id,
-          username,
-          type,
-          clicks: data.clicks || 0,
-          href,
-          videoId,
-          ...data
-        };
-      });
-      setFeed(feedData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching feed:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const filteredFeed = activeTab === "All" 
-    ? feed 
-    : feed.filter(item => item.type === activeTab);
+    // Scroll to top when tab changes
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeTab]);
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
@@ -103,28 +78,48 @@ export default function FeedPage() {
         ))}
       </div>
 
-      {loading ? (
+      {isLoadingInitialData ? (
         <div className="flex items-center justify-center min-h-[300px]">
           <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         </div>
-      ) : filteredFeed.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredFeed.map((item) => (
-            <BoostCard
-              key={item.id}
-              id={item.id}
-              username={item.username}
-              type={item.type as any}
-              clicks={item.clicks}
-              href={item.href}
-              videoId={item.videoId}
-              userId={item.userId}
-              posterName={item.posterName}
-              posterPhoto={item.posterPhoto}
-              createdAt={item.createdAt}
-              supportedBy={item.supportedBy}
-            />
-          ))}
+      ) : feed.length > 0 ? (
+        <div className="flex flex-col gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {feed.map((item) => (
+              <BoostCard
+                key={item.id}
+                id={item.id}
+                username={item.username}
+                type={item.type as any}
+                clicks={item.clicks}
+                href={item.href}
+                videoId={item.videoId}
+                userId={item.userId}
+                posterName={item.posterName}
+                posterPhoto={item.posterPhoto}
+                createdAt={item.createdAt}
+                supportedBy={item.supportedBy}
+              />
+            ))}
+          </div>
+
+          {!isReachingEnd && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => setSize(size + 1)}
+                disabled={isLoadingMore}
+                className="bg-white border border-slate-200 text-slate-600 px-8 py-3 rounded-2xl font-bold hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" /> Loading...
+                  </>
+                ) : (
+                  "Load More Results"
+                )}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center min-h-[300px] text-center gap-4">
@@ -132,7 +127,7 @@ export default function FeedPage() {
             <Inbox size={32} />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">No active boosts</h3>
+            <h3 className="text-lg font-bold text-slate-900">No active boosts in this category</h3>
             <p className="text-slate-500 text-sm">Be the first to create a boost!</p>
           </div>
         </div>

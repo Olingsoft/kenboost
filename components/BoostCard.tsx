@@ -29,7 +29,8 @@ const typeConfig = {
 
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, increment, arrayUnion } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { supportBoostAction } from "@/lib/actions";
 
 export default function BoostCard({ 
   id, username, type, clicks, href, videoId, userId, createdAt, 
@@ -93,21 +94,20 @@ export default function BoostCard({
 
     if (isSupported) return;
 
-    try {
-      // Add 5 points for supporting
-      addPoints(5);
-      setIsSupported(true);
+    // Optimistic UI update
+    const previousSupported = isSupported;
+    setIsSupported(true);
+    addPoints(5);
 
-      // Update Firestore
-      const boostRef = doc(db, "boosts", id);
-      await updateDoc(boostRef, {
-        clicks: increment(1),
-        supportedBy: arrayUnion(auth.currentUser.uid)
-      });
+    try {
+      const result = await supportBoostAction(id, auth.currentUser.uid);
+      if (!result.success) {
+        throw new Error(result.error as string);
+      }
     } catch (error) {
       console.error("Error supporting boost:", error);
       // Revert if failed
-      setIsSupported(false);
+      setIsSupported(previousSupported);
     }
   };
  
