@@ -28,7 +28,7 @@ export default function TikTokEmbed({ videoId, username, embedType }: TikTokEmbe
   return (
     <div className={cn(
       "flex justify-center w-full overflow-hidden rounded-xl bg-slate-50 border border-slate-100 relative z-10",
-      embedType === "creator" ? "max-h-[160px]" : "max-h-[350px]"
+      embedType === "creator" ? "max-h-[130px]" : "max-h-[350px]"
     )}>
       {embedType === "video" && videoId ? (
         <blockquote 

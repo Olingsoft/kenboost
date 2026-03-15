@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Kenboost",
   description: "Kenboost - Boost your TikTok Engagement",
+  icons: {
+    icon: "/kenboost.png",
+  },
 };
 
 export default function RootLayout({

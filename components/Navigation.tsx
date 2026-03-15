@@ -22,10 +22,13 @@ export default function Navigation() {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 h-screen fixed top-0 left-0 bg-white border-r border-slate-200 z-50">
         <div className="p-6">
-          <h1 className="text-2xl font-bold tracking-tighter">
-            <span className="text-slate-900">Ken</span>
-            <span className="text-gradient-green">boost</span>
-          </h1>
+          <Link href="/" className="flex items-center gap-2">
+            <img 
+              src="/kenboost.png" 
+              alt="Kenboost Logo" 
+              className="h-10 w-auto object-contain"
+            />
+          </Link>
         </div>
 
         {/* Points Display - Desktop */}
@@ -107,10 +110,13 @@ export default function Navigation() {
       
       {/* Mobile Top Header */}
       <header className="md:hidden fixed top-0 w-full bg-white/90 backdrop-blur-xl border-b border-slate-200 z-50 px-4 py-3 flex justify-between items-center box-border">
-        <h1 className="text-xl font-bold tracking-tighter">
-          <span className="text-slate-900">Ken</span>
-          <span className="text-gradient-green">boost</span>
-        </h1>
+        <Link href="/" className="flex items-center gap-2">
+          <img 
+            src="/kenboost.png" 
+            alt="Kenboost Logo" 
+            className="h-8 w-auto object-contain"
+          />
+        </Link>
         
         {/* Points Display - Mobile Header */}
         <div className="flex-1 mx-4 max-w-[120px]">
