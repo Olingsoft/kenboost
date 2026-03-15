@@ -112,13 +112,17 @@ export default function FeedPage() {
           {filteredFeed.map((item) => (
             <BoostCard
               key={item.id}
+              id={item.id}
               username={item.username}
               type={item.type as any}
               clicks={item.clicks}
               href={item.href}
               videoId={item.videoId}
               userId={item.userId}
+              posterName={item.posterName}
+              posterPhoto={item.posterPhoto}
               createdAt={item.createdAt}
+              supportedBy={item.supportedBy}
             />
           ))}
         </div>

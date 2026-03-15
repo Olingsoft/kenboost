@@ -28,17 +28,17 @@ export default function TikTokEmbed({ videoId, username, embedType }: TikTokEmbe
   return (
     <div className={cn(
       "flex justify-center w-full overflow-hidden rounded-xl bg-slate-50 border border-slate-100 relative z-10",
-      embedType === "creator" ? "max-h-[135px]" : "max-h-[350px]"
+      embedType === "creator" ? "max-h-[160px]" : "max-h-[350px]"
     )}>
       {embedType === "video" && videoId ? (
         <blockquote 
           className="tiktok-embed" 
-          cite={`https://www.tiktok.com/@user/video/${videoId}`} 
+          cite={`https://www.tiktok.com/@${username || 'user'}/video/${videoId}`} 
           data-video-id={videoId} 
           style={{ maxWidth: "100%", width: "100%", margin: 0 }}
         >
           <section>
-            <a target="_blank" title="TikTok Video" href={`https://www.tiktok.com/video/${videoId}`}>Loading video...</a>
+            <a target="_blank" title="TikTok Video" href={`https://www.tiktok.com/@${username || 'user'}/video/${videoId}`}>Loading video...</a>
           </section>
         </blockquote>
       ) : embedType === "creator" && username ? (

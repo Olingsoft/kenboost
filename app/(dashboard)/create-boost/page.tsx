@@ -16,11 +16,17 @@ export default function CreateBoostPage() {
   const [error, setError] = useState<string | null>(null);
   const [verifiedUser, setVerifiedUser] = useState<{username: string, avatar: string} | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{displayName: string, photoURL: string | null} | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUserId(user.uid);
+        // Get more details from auth or firestore
+        setCurrentUserProfile({
+          displayName: user.displayName || "User",
+          photoURL: user.photoURL || null
+        });
       } else {
         router.push("/login");
       }
@@ -71,6 +77,8 @@ export default function CreateBoostPage() {
       // 1. Create the boost document
       const boostData = {
         userId: currentUserId,
+        posterName: currentUserProfile?.displayName || "User",
+        posterPhoto: currentUserProfile?.photoURL || null,
         type: boostType,
         target: inputValue,
         status: "Active",

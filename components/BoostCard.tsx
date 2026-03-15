@@ -7,13 +7,17 @@ import TikTokEmbed from "./TikTokEmbed";
 type BoostType = "Followers" | "Views" | "Likes" | "Comments";
 
 interface BoostCardProps {
+  id: string; // The boost document ID
   username: string; // This is the target TikTok username
   type: BoostType;
   clicks: number;
   href: string;
   videoId?: string;
   userId?: string; // The Kenboost user ID who created the boost
+  posterName?: string; // Optinal pre-fetched poster name
+  posterPhoto?: string | null; // Optional pre-fetched poster photo
   createdAt?: any;
+  supportedBy?: string[]; // IDs of users who have supported this boost
 }
 
 const typeConfig = {
@@ -24,23 +28,32 @@ const typeConfig = {
 };
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { doc, getDoc, updateDoc, increment, arrayUnion } from "firebase/firestore";
 
-export default function BoostCard({ username, type, clicks, href, videoId, userId, createdAt }: BoostCardProps) {
+export default function BoostCard({ 
+  id, username, type, clicks, href, videoId, userId, createdAt, 
+  posterName: initialPosterName, posterPhoto: initialPosterPhoto,
+  supportedBy = []
+}: BoostCardProps) {
   const Config = typeConfig[type];
   const Icon = Config.icon;
   const { addPoints } = usePoints();
-  const [posterName, setPosterName] = useState<string>("User");
+  const [posterName, setPosterName] = useState<string>(initialPosterName || "User");
+  const [posterPhoto, setPosterPhoto] = useState<string | null>(initialPosterPhoto || null);
 
   useEffect(() => {
-    if (!userId) return;
+    // If we already have the name and we don't have a photo but we don't NEED to fetch, skip.
+    // However, if we only have the userId, we fetch.
+    if (initialPosterName || !userId) return;
     
     const fetchPoster = async () => {
       try {
         const userDoc = await getDoc(doc(db, "users", userId));
         if (userDoc.exists()) {
-          setPosterName(userDoc.data().displayName || "User");
+          const data = userDoc.data();
+          setPosterName(data.displayName || "User");
+          setPosterPhoto(data.photoURL || null);
         }
       } catch (err) {
         console.error("Error fetching poster:", err);
@@ -48,7 +61,7 @@ export default function BoostCard({ username, type, clicks, href, videoId, userI
     };
     
     fetchPoster();
-  }, [userId]);
+  }, [userId, initialPosterName]);
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "Just now";
@@ -62,22 +75,57 @@ export default function BoostCard({ username, type, clicks, href, videoId, userI
     return date.toLocaleDateString();
   };
 
-  const handleSupport = () => {
-    // Add 5 points for supporting
-    addPoints(5);
-  };
+  const [isSupported, setIsSupported] = useState(false);
 
-  return (
+  useEffect(() => {
+    if (auth.currentUser && supportedBy.includes(auth.currentUser.uid)) {
+      setIsSupported(true);
+    } else {
+      setIsSupported(false);
+    }
+  }, [auth.currentUser, supportedBy]);
+
+  const handleSupport = async () => {
+    if (!auth.currentUser) {
+      alert("Please sign in to support others!");
+      return;
+    }
+
+    if (isSupported) return;
+
+    try {
+      // Add 5 points for supporting
+      addPoints(5);
+      setIsSupported(true);
+
+      // Update Firestore
+      const boostRef = doc(db, "boosts", id);
+      await updateDoc(boostRef, {
+        clicks: increment(1),
+        supportedBy: arrayUnion(auth.currentUser.uid)
+      });
+    } catch (error) {
+      console.error("Error supporting boost:", error);
+      // Revert if failed
+      setIsSupported(false);
+    }
+  };
+ 
+  return ( 
     <div className="glass-panel p-5 rounded-2xl flex flex-col gap-4 relative overflow-hidden group hover:border-emerald-200 transition-all duration-300">
-      {/* Top row: User and Badges */}
+      {/* Top row: User and Badges */} 
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-100 to-emerald-50 border border-emerald-200 flex items-center justify-center">
-            <span className="text-sm font-bold text-emerald-700 uppercase">{posterName.slice(0, 2)}</span>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-slate-100 to-white border border-slate-200 flex items-center justify-center overflow-hidden">
+            {posterPhoto ? ( 
+              <img src={posterPhoto} alt={posterName} className="w-full h-full object-cover" />
+            ) : ( 
+              <span className="text-xs font-bold text-slate-500 uppercase">{posterName.slice(0, 2)}</span>
+            )} 
           </div>
           <div>
-            <h3 className="text-slate-900 font-bold text-sm">{posterName}</h3>
-            <p className="text-[10px] text-slate-500 font-medium">{formatDate(createdAt)}</p>
+            <h3 className="text-slate-900 font-bold text-sm leading-tight">{posterName}</h3>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{formatDate(createdAt)}</p>
           </div>
         </div>
         
@@ -115,17 +163,22 @@ export default function BoostCard({ username, type, clicks, href, videoId, userI
           </div>
         </div>
       </div>
-
+    
       {/* Bottom: Action */}
       <div className="flex gap-3 mt-1">
         <a
-          href={type === "Followers" ? `https://www.tiktok.com/@${username}` : (videoId ? `https://www.tiktok.com/video/${videoId}` : href)}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleSupport}
-          className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-emerald-200"
+          className={cn(
+            "flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm",
+            isSupported 
+              ? "bg-slate-100 text-slate-400 cursor-default" 
+              : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200"
+          )}
         >
-          Open & Support <ExternalLink size={16} strokeWidth={2.5} />
+          {isSupported ? "Supported" : "Open & Support"} <ExternalLink size={16} strokeWidth={2.5} />
         </a>
       </div>
 

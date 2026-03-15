@@ -2,26 +2,49 @@
 
 import { useState, useEffect } from "react";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { User, Settings, TrendingUp, Link as LinkIcon, Star, CheckCircle, Loader2 } from "lucide-react";
+import { User, Settings, TrendingUp, Link as LinkIcon, Star, CheckCircle, Loader2, MousePointerClick } from "lucide-react";
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [myBoosts, setMyBoosts] = useState<any[]>([]);
+  const [totalClicks, setTotalClicks] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
         try {
+          // 1. Get user document
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             setUserData(userDoc.data());
           }
+
+          // 2. Get user's boosts
+          const q = query(
+            collection(db, "boosts"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc")
+          );
+          
+          const querySnapshot = await getDocs(q);
+          const boosts = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          setMyBoosts(boosts);
+          
+          // 3. Calculate total clicks
+          const total = boosts.reduce((sum, b: any) => sum + (b.clicks || 0), 0);
+          setTotalClicks(total);
+          
         } catch (error) {
-          console.error("Error fetching user data:", error);
+          console.error("Error fetching profile data:", error);
         }
       }
       setLoading(false);
@@ -36,10 +59,6 @@ export default function ProfilePage() {
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
 
-  const recentBoosts = [
-    { id: 1, type: "Followers", link: "https://tiktok.com/@alex/...1", status: "Completed", clicks: 350 },
-    { id: 2, type: "Views", link: "https://tiktok.com/@alex/...2", status: "Active", clicks: 120 },
-  ];
 
   if (loading) {
     return (
@@ -63,9 +82,9 @@ export default function ProfilePage() {
     email: firebaseUser.email,
     joinDate: formatDate(userData?.createdAt),
     stats: {
-      clicks: userData?.totalClicks || "0",
+      clicks: totalClicks.toLocaleString(),
       boosted: userData?.followersGained || "0",
-      posts: userData?.totalPosts || "0"
+      posts: myBoosts.length || "0"
     }
   };
 
@@ -126,33 +145,39 @@ export default function ProfilePage() {
         </h2>
         
         <div className="flex flex-col gap-3">
-          {recentBoosts.map(boost => (
-            <div key={boost.id} className="glass-panel p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow bg-white/50 backdrop-blur-sm">
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded-lg border ${boost.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                  {boost.status === 'Active' ? <TrendingUp size={20} /> : <CheckCircle size={20} />}
-                </div>
-                <div>
-                  <div className="text-slate-900 font-bold text-sm flex items-center gap-1">
-                    {boost.type} Boost
+          {myBoosts.length > 0 ? (
+            myBoosts.map((boost: any) => (
+              <div key={boost.id} className="glass-panel p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow bg-white/50 backdrop-blur-sm">
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-lg border ${boost.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    {boost.status === 'Active' ? <TrendingUp size={20} /> : <CheckCircle size={20} />}
                   </div>
-                  <a href={boost.link} className="text-xs font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-1 mt-1 truncate max-w-[200px]">
-                    <LinkIcon size={12} /> {boost.link}
-                  </a>
+                  <div>
+                    <div className="text-slate-900 font-bold text-sm flex items-center gap-1">
+                      {boost.type} Boost
+                    </div>
+                    <a href={boost.target} className="text-xs font-medium text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-1 mt-1 truncate max-w-[200px]">
+                      <LinkIcon size={12} /> {boost.target}
+                    </a>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-slate-900 font-black">{boost.clicks || 0}</div>
+                    <div className="text-xs text-slate-500 font-medium whitespace-nowrap">Clicks Received</div>
+                  </div>
+                  <div className={`text-xs font-bold px-3 py-1 rounded-full border ${boost.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                    {boost.status}
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="text-slate-900 font-black">{boost.clicks}</div>
-                  <div className="text-xs text-slate-500 font-medium">Clicks</div>
-                </div>
-                <div className={`text-xs font-bold px-3 py-1 rounded-full border ${boost.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                  {boost.status}
-                </div>
-              </div>
+            ))
+          ) : (
+            <div className="text-center py-10 bg-slate-50/50 rounded-2xl border border-slate-100 border-dashed">
+              <p className="text-slate-400 font-medium">No boosts created yet</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
