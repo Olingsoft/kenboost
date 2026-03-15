@@ -51,7 +51,7 @@ export default function SignupPage() {
       // Save to Firestore
       await saveUserToFirestore(user, fullName);
 
-      router.push("/dashboard");
+      router.push("/");
     } catch (err: any) {
       console.error("Signup error:", err);
       setError(err.message || "An error occurred during sign up.");
